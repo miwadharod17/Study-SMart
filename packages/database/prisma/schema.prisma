@@ -1,0 +1,365 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ─────────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  VENDOR
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ProductCategory {
+  NOTES
+  TEXTBOOKS
+  ELECTRONICS
+  STATIONERY
+  OTHER
+}
+
+enum ProductCondition {
+  NEW
+  LIKE_NEW
+  GOOD
+  FAIR
+}
+
+enum ProductStatus {
+  ACTIVE
+  SOLD
+  INACTIVE
+  PENDING_REVIEW
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  STRIPE
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PostCategory {
+  ACADEMIC
+  CAREER
+  CAMPUS_LIFE
+  ANNOUNCEMENTS
+  STUDY_GROUP
+  GENERAL
+}
+
+enum PostStatus {
+  PUBLISHED
+  DRAFT
+  REMOVED
+}
+
+enum NotificationType {
+  ORDER_PLACED
+  ORDER_CONFIRMED
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  FORUM_COMMENT
+  FORUM_LIKE
+  SELLER_CONTACT
+  ADMIN_ANNOUNCEMENT
+  PRODUCT_APPROVED
+  PRODUCT_REJECTED
+}
+
+// ─── User ──────────────────────────────────────────────────────────────────
+
+model User {
+  id                 String             @id @default(cuid())
+  email              String             @unique
+  password           String
+  name               String
+  role               Role               @default(STUDENT)
+  avatarUrl          String?
+  collegeId          String?            // campus roll number
+  college            String?
+  isEmailVerified    Boolean            @default(false)
+  verificationStatus VerificationStatus @default(PENDING)
+  refreshToken       String?
+
+  // Vendor-specific
+  businessName        String?
+  businessDescription String?
+  contactPhone        String?
+  isCollegeVerified   Boolean           @default(false)
+  totalSales          Int               @default(0)
+  rating              Float             @default(0)
+
+  // Relations
+  products      Product[]
+  buyerOrders   Order[]        @relation("BuyerOrders")
+  sellerOrders  OrderItem[]    @relation("SellerOrderItems")
+  posts         ForumPost[]
+  comments      ForumComment[]
+  postLikes     PostLike[]
+  commentLikes  CommentLike[]
+  notifications Notification[]
+  chatMessages  ChatMessage[]
+  sentMessages  ChatMessage[]  @relation("SentMessages")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ─── Product ───────────────────────────────────────────────────────────────
+
+model Product {
+  id          String           @id @default(cuid())
+  title       String
+  description String
+  price       Float
+  category    ProductCategory
+  condition   ProductCondition
+  status      ProductStatus    @default(PENDING_REVIEW)
+  images      String[]
+  college     String?
+  subject     String?
+  semester    Int?
+  viewCount   Int              @default(0)
+
+  sellerId String
+  seller   User   @relation(fields: [sellerId], references: [id])
+
+  tags       ProductTag[]
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sellerId])
+  @@index([category])
+  @@index([status])
+  @@map("products")
+}
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  slug     String       @unique
+  color    String?
+  products ProductTag[]
+  posts    PostTag[]
+
+  @@map("tags")
+}
+
+model ProductTag {
+  productId String
+  tagId     String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id])
+
+  @@id([productId, tagId])
+  @@map("product_tags")
+}
+
+// ─── Orders & Payments ─────────────────────────────────────────────────────
+
+model Order {
+  id              String        @id @default(cuid())
+  buyerId         String
+  buyer           User          @relation("BuyerOrders", fields: [buyerId], references: [id])
+  items           OrderItem[]
+  totalAmount     Float
+  status          OrderStatus   @default(PENDING)
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentId       String?
+  deliveryAddress String?
+  notes           String?
+  sellerContactShared Boolean  @default(false)
+
+  chatRoom ChatRoom?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([buyerId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  sellerId     String
+  seller       User    @relation("SellerOrderItems", fields: [sellerId], references: [id])
+  productTitle String
+  productImage String
+  price        Float
+  quantity     Int     @default(1)
+
+  @@index([orderId])
+  @@index([sellerId])
+  @@map("order_items")
+}
+
+// ─── Forum ─────────────────────────────────────────────────────────────────
+
+model ForumPost {
+  id           String       @id @default(cuid())
+  title        String
+  content      String       @db.Text
+  category     PostCategory
+  status       PostStatus   @default(PUBLISHED)
+  authorId     String
+  author       User         @relation(fields: [authorId], references: [id])
+  likeCount    Int          @default(0)
+  commentCount Int          @default(0)
+  viewCount    Int          @default(0)
+  isPinned     Boolean      @default(false)
+  college      String?
+
+  tags     PostTag[]
+  comments ForumComment[]
+  likes    PostLike[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([category])
+  @@map("forum_posts")
+}
+
+model ForumComment {
+  id              String  @id @default(cuid())
+  postId          String
+  post            ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  content         String  @db.Text
+  authorId        String
+  author          User    @relation(fields: [authorId], references: [id])
+  likeCount       Int     @default(0)
+  parentCommentId String?
+  parent          ForumComment?  @relation("CommentReplies", fields: [parentCommentId], references: [id])
+  replies         ForumComment[] @relation("CommentReplies")
+  likes           CommentLike[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId])
+  @@index([authorId])
+  @@map("forum_comments")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+  post   ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag       @relation(fields: [tagId], references: [id])
+
+  @@id([postId, tagId])
+  @@map("post_tags")
+}
+
+model PostLike {
+  userId String
+  postId String
+  user   User      @relation(fields: [userId], references: [id])
+  post   ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+  @@map("post_likes")
+}
+
+model CommentLike {
+  userId    String
+  commentId String
+  user      User         @relation(fields: [userId], references: [id])
+  comment   ForumComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, commentId])
+  @@map("comment_likes")
+}
+
+// ─── Notifications ─────────────────────────────────────────────────────────
+
+model Notification {
+  id       String           @id @default(cuid())
+  userId   String
+  user     User             @relation(fields: [userId], references: [id])
+  type     NotificationType
+  title    String
+  message  String
+  isRead   Boolean          @default(false)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+// ─── Chat (seller contacts buyer post-order) ───────────────────────────────
+
+model ChatRoom {
+  id      String @id @default(cuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  messages ChatMessage[]
+
+  createdAt DateTime @default(now())
+
+  @@map("chat_rooms")
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  roomId     String
+  room       ChatRoom @relation(fields: [roomId], references: [id])
+  senderId   String
+  sender     User     @relation(fields: [senderId], references: [id])
+  receiverId String
+  receiver   User     @relation("SentMessages", fields: [receiverId], references: [id])
+  content    String
+  isRead     Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([roomId])
+  @@map("chat_messages")
+}
