@@ -1,0 +1,33 @@
+---
+# Global variables for all hosts
+environment: production
+
+# Docker settings
+docker_compose_version: "2.20.0"
+
+# Application settings
+app_name: study-smart
+app_version: "{{ lookup('env', 'APP_VERSION') | default('latest', true) }}"
+
+# Database settings
+db_name: studysmart_db
+db_user: studysmart_user
+db_password: "{{ vault_db_password }}"
+
+# Monitoring
+grafana_password: "{{ vault_grafana_password }}"
+prometheus_retention_days: 15
+
+# Slack notifications
+slack_webhook_url: "{{ vault_slack_webhook }}"
+
+# SSL certificates
+ssl_email: admin@studysmart.com
+ssl_domains:
+  - studysmart.com
+  - api.studysmart.com
+
+# Resource limits
+max_connections: 500
+memory_limit: "2G"
+cpu_limit: 4

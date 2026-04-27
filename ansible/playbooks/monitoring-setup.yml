@@ -1,0 +1,90 @@
+---
+- name: Setup monitoring stack
+  hosts: monitoring_hosts
+  become: yes
+  
+  roles:
+    - role: monitoring
+      vars:
+        prometheus_version: "2.47.0"
+        grafana_version: "10.2.0"
+        alertmanager_version: "0.25.0"
+    
+  tasks:
+    - name: Create monitoring directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /opt/monitoring/prometheus
+        - /opt/monitoring/grafana
+        - /opt/monitoring/alertmanager
+        - /opt/monitoring/node-exporter
+    
+    - name: Copy Prometheus configuration
+      template:
+        src: ../templates/prometheus.yml.j2
+        dest: /opt/monitoring/prometheus/prometheus.yml
+      notify: restart prometheus
+    
+    - name: Copy Alertmanager configuration
+      template:
+        src: ../templates/alertmanager.yml.j2
+        dest: /opt/monitoring/alertmanager/alertmanager.yml
+      notify: restart alertmanager
+    
+    - name: Start monitoring stack with docker-compose
+      docker_compose:
+        project_src: /opt/monitoring
+        definition:
+          version: '3.8'
+          services:
+            prometheus:
+              image: prom/prometheus:latest
+              ports:
+                - "9090:9090"
+              volumes:
+                - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+                - prometheus_data:/prometheus
+              command:
+                - '--config.file=/etc/prometheus/prometheus.yml'
+                - '--storage.tsdb.path=/prometheus'
+            
+            grafana:
+              image: grafana/grafana:latest
+              ports:
+                - "3000:3000"
+              environment:
+                - GF_SECURITY_ADMIN_PASSWORD={{ grafana_password }}
+              volumes:
+                - grafana_data:/var/lib/grafana
+            
+            node-exporter:
+              image: prom/node-exporter:latest
+              ports:
+                - "9100:9100"
+              volumes:
+                - /proc:/host/proc:ro
+                - /sys:/host/sys:ro
+                - /:/rootfs:ro
+              command:
+                - '--path.procfs=/host/proc'
+                - '--path.sysfs=/host/sys'
+                - '--path.rootfs=/rootfs'
+          
+          volumes:
+            prometheus_data:
+            grafana_data:
+        state: present
+    
+  handlers:
+    - name: restart prometheus
+      docker_container:
+        name: prometheus
+        state: restarted
+    
+    - name: restart alertmanager
+      docker_container:
+        name: alertmanager
+        state: restarted

@@ -1,0 +1,121 @@
+name: CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+
+env:
+  DOCKER_REGISTRY: docker.io/studysmart
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service: [payment-service, forum-service, crud-service, frontend]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ env.DOCKER_REGISTRY }}/${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=sha,format=short
+    
+    - name: Build and push
+      uses: docker/build-push-action@v4
+      with:
+        context: ./${{ matrix.service == 'frontend' && 'frontend' || format('backend/services/{0}', matrix.service) }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy-staging:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+    
+    - name: Set up Kubeconfig
+      run: |
+        mkdir -p $HOME/.kube
+        echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 --decode > $HOME/.kube/config
+    
+    - name: Deploy to staging
+      run: |
+        kubectl set image deployment/payment-service payment=${{ env.DOCKER_REGISTRY }}/payment-service:${{ github.sha }} -n study-smart-staging
+        kubectl set image deployment/forum-service forum=${{ env.DOCKER_REGISTRY }}/forum-service:${{ github.sha }} -n study-smart-staging
+        kubectl set image deployment/crud-service crud=${{ env.DOCKER_REGISTRY }}/crud-service:${{ github.sha }} -n study-smart-staging
+        kubectl set image deployment/frontend frontend=${{ env.DOCKER_REGISTRY }}/frontend:${{ github.sha }} -n study-smart-staging
+        kubectl rollout status deployment -n study-smart-staging --timeout=5m
+  
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure kubectl
+      uses: azure/setup-kubectl@v3
+    
+    - name: Set up Kubeconfig
+      run: |
+        mkdir -p $HOME/.kube
+        echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 --decode > $HOME/.kube/config
+    
+    - name: Deploy to production
+      run: |
+        kubectl set image deployment/payment-service payment=${{ env.DOCKER_REGISTRY }}/payment-service:${{ github.sha }} -n study-smart
+        kubectl set image deployment/forum-service forum=${{ env.DOCKER_REGISTRY }}/forum-service:${{ github.sha }} -n study-smart
+        kubectl set image deployment/crud-service crud=${{ env.DOCKER_REGISTRY }}/crud-service:${{ github.sha }} -n study-smart
+        kubectl set image deployment/frontend frontend=${{ env.DOCKER_REGISTRY }}/frontend:${{ github.sha }} -n study-smart
+        kubectl rollout status deployment -n study-smart --timeout=10m
+    
+    - name: Notify Slack
+      uses: slackapi/slack-github-action@v1.24
+      with:
+        payload: |
+          {
+            "text": "🚀 Deployment ${{ github.ref_name }} completed successfully!",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "✅ *Production deployment successful!*\nVersion: ${{ github.ref_name }}\nEnvironment: production"
+                }
+              }
+            ]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

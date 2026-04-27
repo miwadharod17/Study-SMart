@@ -21,3 +21,40 @@
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
     
+    - name: Copy environment file
+      copy:
+        src: ../../.env.production
+        dest: /opt/studysmart/.env
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+    
+    - name: Pull latest images
+      docker_compose:
+        project_src: /opt/studysmart
+        state: present
+        pull: yes
+      register: compose_output
+    
+    - name: Start containers
+      docker_compose:
+        project_src: /opt/studysmart
+        state: present
+        recreate: always
+    
+    - name: Check if containers are running
+      docker_container_info:
+        name: "{{ item }}"
+      loop:
+        - study_smart_postgres
+        - study_smart_payment
+        - study_smart_forum
+        - study_smart_crud
+        - study_smart_frontend
+        - study_smart_nginx
+      register: containers
+    
+    - name: Display container status
+      debug:
+        msg: "{{ item.container.Name }} is {{ item.container.State.Status }}"
+      loop: "{{ containers.results }}"
+      when: item.container is defined
