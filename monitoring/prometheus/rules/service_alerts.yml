@@ -1,0 +1,19 @@
+groups:
+  - name: business_metrics
+    interval: 1m
+    rules:
+      - record: service:payment_success_rate
+        expr: |
+          sum(rate(payment_success_total[5m])) / 
+          sum(rate(payment_attempts_total[5m])) * 100
+
+      - record: service:forum_engagement
+        expr: |
+          sum(rate(forum_questions_created[1h])) + 
+          sum(rate(forum_answers_posted[1h]))
+
+      - record: service:crud_operations_per_second
+        expr: |
+          sum(rate(crud_create_operations[1m])) +
+          sum(rate(crud_update_operations[1m])) +
+          sum(rate(crud_delete_operations[1m]))

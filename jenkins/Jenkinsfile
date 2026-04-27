@@ -1,0 +1,146 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = 'docker.io/studysmart'
+        K8S_NAMESPACE = 'study-smart'
+        SONAR_HOST_URL = 'http://sonarqube:9000'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'npm install'
+                    sh 'npm run test:coverage'
+                    sh 'sonar-scanner'
+                }
+            }
+        }
+        
+        stage('Build Docker Images') {
+            parallel {
+                stage('Build Payment') {
+                    steps {
+                        script {
+                            dir('backend/services/payment-service') {
+                                sh "docker build -t ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} ."
+                                sh "docker tag ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} ${DOCKER_REGISTRY}/payment-service:latest"
+                            }
+                        }
+                    }
+                }
+                stage('Build Forum') {
+                    steps {
+                        script {
+                            dir('backend/services/forum-service') {
+                                sh "docker build -t ${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER} ."
+                                sh "docker tag ${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER} ${DOCKER_REGISTRY}/forum-service:latest"
+                            }
+                        }
+                    }
+                }
+                stage('Build CRUD') {
+                    steps {
+                        script {
+                            dir('backend/services/crud-service') {
+                                sh "docker build -t ${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER} ."
+                                sh "docker tag ${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER} ${DOCKER_REGISTRY}/crud-service:latest"
+                            }
+                        }
+                    }
+                }
+                stage('Build Frontend') {
+                    steps {
+                        script {
+                            dir('frontend') {
+                                sh "docker build -t ${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER} ."
+                                sh "docker tag ${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER} ${DOCKER_REGISTRY}/frontend:latest"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Push to Registry') {
+            steps {
+                script {
+                    docker.withRegistry("https://${DOCKER_REGISTRY}") {
+                        sh "docker push ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER}"
+                        sh "docker push ${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER}"
+                        sh "docker push ${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER}"
+                        sh "docker push ${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER}"
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    withKubeConfig([credentialsId: 'kubeconfig']) {
+                        sh """
+                            kubectl set image deployment/payment-service payment=${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} -n ${K8S_NAMESPACE}
+                            kubectl set image deployment/forum-service forum=${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER} -n ${K8S_NAMESPACE}
+                            kubectl set image deployment/crud-service crud=${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER} -n ${K8S_NAMESPACE}
+                            kubectl set image deployment/frontend frontend=${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER} -n ${K8S_NAMESPACE}
+                            kubectl rollout status deployment/payment-service -n ${K8S_NAMESPACE}
+                            kubectl rollout status deployment/forum-service -n ${K8S_NAMESPACE}
+                            kubectl rollout status deployment/crud-service -n ${K8S_NAMESPACE}
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Smoke Tests') {
+            steps {
+                script {
+                    sh """
+                        curl -f http://api.studysmart.com/health || exit 1
+                        curl -f http://studysmart.com || exit 1
+                    """
+                }
+            }
+        }
+        
+        stage('Rollback if Failed') {
+            when {
+                expression { currentBuild.result == 'FAILURE' }
+            }
+            steps {
+                script {
+                    withKubeConfig([credentialsId: 'kubeconfig']) {
+                        sh """
+                            kubectl rollout undo deployment/payment-service -n ${K8S_NAMESPACE}
+                            kubectl rollout undo deployment/forum-service -n ${K8S_NAMESPACE}
+                            kubectl rollout undo deployment/crud-service -n ${K8S_NAMESPACE}
+                        """
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            slackSend(
+                color: 'good',
+                message: "Deployment successful! Build: ${BUILD_NUMBER}"
+            )
+        }
+        failure {
+            slackSend(
+                color: 'danger',
+                message: "Deployment failed! Build: ${BUILD_NUMBER}"
+            )
+        }
+    }
+}

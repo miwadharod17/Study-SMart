@@ -1,0 +1,23 @@
+---
+- name: Deploy Study-SMart application
+  hosts: app_servers
+  become: yes
+  
+  vars_files:
+    - ../group_vars/all.yml
+  
+  tasks:
+    - name: Create application directory
+      file:
+        path: /opt/studysmart
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+    
+    - name: Copy docker-compose file
+      copy:
+        src: ../../docker-compose.yml
+        dest: /opt/studysmart/docker-compose.yml
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+    

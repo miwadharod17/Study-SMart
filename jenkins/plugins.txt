@@ -1,0 +1,10 @@
+blueocean:latest
+docker-workflow:latest
+kubernetes:latest
+pipeline-aws:latest
+sonar:latest
+slack:latest
+github:latest
+terraform:latest
+ansible:latest
+prometheus:latest
