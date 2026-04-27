@@ -1,0 +1,28 @@
+{
+  "books": [
+    {
+      "title": "Introduction to Algorithms",
+      "description": "The classic algorithms textbook",
+      "price": 1290,
+      "condition": "new",
+      "category": "Computer Science",
+      "stock": 5
+    },
+    {
+      "title": "Clean Code",
+      "description": "A handbook of agile software craftsmanship",
+      "price": 850,
+      "condition": "used",
+      "category": "Programming",
+      "stock": 2
+    },
+    {
+      "title": "Design Patterns",
+      "description": "Elements of Reusable Object-Oriented Software",
+      "price": 950,
+      "condition": "new",
+      "category": "Computer Science",
+      "stock": 3
+    }
+  ]
+}

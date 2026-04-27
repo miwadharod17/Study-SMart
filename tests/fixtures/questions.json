@@ -1,0 +1,19 @@
+{
+  "questions": [
+    {
+      "title": "How to learn React effectively?",
+      "content": "What are the best resources and practices for learning React?",
+      "tags": ["react", "javascript", "frontend"]
+    },
+    {
+      "title": "Understanding closures in JavaScript",
+      "content": "Can someone explain closures with practical examples?",
+      "tags": ["javascript", "closures"]
+    },
+    {
+      "title": "Best practices for REST API design",
+      "content": "What are the industry standards for designing REST APIs?",
+      "tags": ["api", "rest", "backend"]
+    }
+  ]
+}

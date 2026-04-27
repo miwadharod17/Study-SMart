@@ -1,0 +1,92 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 50
+      rampTo: 100
+      name: "Ramp up to peak"
+    - duration: 60
+      arrivalRate: 100
+      name: "Sustained peak"
+  processor: "./load-test-processor.js"
+
+scenarios:
+  - name: "Browse and Purchase Flow"
+    flow:
+      - get:
+          url: "/api/books"
+      - think: 2
+      
+      - post:
+          url: "/api/users/login"
+          json:
+            email: "{{ email }}"
+            password: "testpass123"
+          capture:
+            json: "$.token"
+            as: "authToken"
+      
+      - get:
+          url: "/api/books/{{ bookId }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      
+      - post:
+          url: "/api/orders"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            bookId: "{{ bookId }}"
+            quantity: 1
+            shippingAddress:
+              address: "Test Address"
+              city: "Mumbai"
+              pincode: "400001"
+      
+      - post:
+          url: "/api/create-payment"
+          json:
+            amount: 500
+            orderId: "{{ orderId }}"
+            userId: "{{ userId }}"
+
+  - name: "Forum Activity"
+    flow:
+      - get:
+          url: "/api/questions"
+      
+      - post:
+          url: "/api/questions"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            title: "Load Test Question {{ $randomString() }}"
+            content: "This is a load test question content"
+            tags: ["load-test"]
+      
+      - get:
+          url: "/api/questions/{{ questionId }}"
+      
+      - post:
+          url: "/api/questions/{{ questionId }}/answers"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            content: "This is a load test answer"
+
+  - name: "Search and Filter"
+    flow:
+      - get:
+          url: "/api/books?category=Textbooks"
+      - get:
+          url: "/api/books?search=computer"
+      - get:
+          url: "/api/books?minPrice=100&maxPrice=1000"
+
+reporting:
+  - type: console
+  - type: csv
+    filename: "load-test-results.csv"

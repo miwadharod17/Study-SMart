@@ -1,0 +1,28 @@
+{
+  "users": [
+    {
+      "email": "student1@test.com",
+      "password": "student123",
+      "fullName": "Student One",
+      "role": "student"
+    },
+    {
+      "email": "student2@test.com",
+      "password": "student123",
+      "fullName": "Student Two",
+      "role": "student"
+    },
+    {
+      "email": "seller1@test.com",
+      "password": "seller123",
+      "fullName": "Seller One",
+      "role": "seller"
+    },
+    {
+      "email": "admin@test.com",
+      "password": "admin123",
+      "fullName": "Admin User",
+      "role": "admin"
+    }
+  ]
+}

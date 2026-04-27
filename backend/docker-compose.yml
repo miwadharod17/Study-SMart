@@ -1,0 +1,82 @@
+services:
+  postgres:
+    build: ./database
+    container_name: study_smart_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - study_smart_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  payment-service:
+    build: ./services/payment-service
+    container_name: study_smart_payment
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    networks:
+      - study_smart_net
+    restart: unless-stopped
+
+  forum-service:
+    build: ./services/forum-service
+    container_name: study_smart_forum
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+    networks:
+      - study_smart_net
+    restart: unless-stopped
+
+  crud-service:
+    build: ./services/crud-service
+    container_name: study_smart_crud
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3003:3003"
+    networks:
+      - study_smart_net
+    restart: unless-stopped
+
+  nginx:
+    build: ./api-gateway
+    container_name: study_smart_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - payment-service
+      - forum-service
+      - crud-service
+    networks:
+      - study_smart_net
+    restart: unless-stopped
+
+networks:
+  study_smart_net:
+    driver: bridge
+
+volumes:
+  postgres_data:

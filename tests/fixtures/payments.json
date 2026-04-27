@@ -1,0 +1,19 @@
+{
+  "payments": [
+    {
+      "amount": 500,
+      "currency": "INR",
+      "method": "card"
+    },
+    {
+      "amount": 1290,
+      "currency": "INR",
+      "method": "upi"
+    },
+    {
+      "amount": 850,
+      "currency": "INR",
+      "method": "netbanking"
+    }
+  ]
+}

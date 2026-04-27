@@ -1,29 +1,20 @@
 {
-  "name": "study-smart",
-  "private": true,
-  "version": "1.0.0",
-  "description": "Study Smart — Campus marketplace and forum for students",
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
-    "db:generate": "pnpm --filter @study-smart/database db:generate",
-    "db:migrate": "pnpm --filter @study-smart/database db:migrate",
-    "db:seed": "pnpm --filter @study-smart/database db:seed",
-    "db:studio": "pnpm --filter @study-smart/database db:studio",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:e2e": "jest tests/e2e",
+    "test:load": "artillery run tests/load/load-test.yml",
+    "test:stress": "artillery run tests/load/stress-test.yml",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
   },
   "devDependencies": {
-    "turbo": "^2.0.0",
-    "typescript": "^5.4.0",
-    "prettier": "^3.3.0",
-    "@types/node": "^20.0.0"
-  },
-  "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
-  },
-  "packageManager": "pnpm@9.0.0"
+    "jest": "^29.5.0",
+    "supertest": "^6.3.3",
+    "puppeteer": "^20.7.4",
+    "artillery": "^2.0.0-31",
+    "@faker-js/faker": "^8.0.2",
+    "socket.io-client": "^4.6.1"
+  }
 }

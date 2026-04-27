@@ -1,0 +1,31 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 20
+      name: "Initial"
+    - duration: 60
+      arrivalRate: 100
+      rampTo: 500
+      name: "Stress ramp"
+    - duration: 60
+      arrivalRate: 500
+      name: "Peak stress"
+    - duration: 30
+      arrivalRate: 20
+      name: "Cooldown"
+  
+  processor: "./stress-test-processor.js"
+  
+  ensure:
+    p95: 500
+    p99: 1000
+    errorRate: 0.05
+
+scenarios:
+  - name: "High load test"
+    flow:
+      - loop:
+          - function: "generateRandomAction"
+          - think: 0.5
+        count: 100
