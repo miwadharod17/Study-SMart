@@ -120,7 +120,7 @@ app.get('/api/questions', async (req, res) => {
         }
         
         query += ` GROUP BY q.id, u.full_name, u.reputation `;
-        
+
         switch (sort) {
             case 'newest':
                 query += ` ORDER BY q.created_at DESC`;
@@ -129,7 +129,7 @@ app.get('/api/questions', async (req, res) => {
                 query += ` ORDER BY q.votes DESC`;
                 break;
             case 'unanswered':
-                query += ` HAVING COUNT(DISTINCT a.id) = 0`;
+                query += ` HAVING COUNT(DISTINCT a.id) = 0 ORDER BY q.created_at DESC`;
                 break;
             default:
                 query += ` ORDER BY q.created_at DESC`;
@@ -330,7 +330,7 @@ app.post('/api/answers/:answerId/accept', async (req, res) => {
         // Mark question as resolved
         await pool.query(
             'UPDATE questions SET is_resolved = true WHERE id = $1',
-            [answer.question_id]
+            [answer.rows[0].question_id]
         );
         
         end({ method: 'POST', route: '/answers/:answerId/accept', status_code: 200 });

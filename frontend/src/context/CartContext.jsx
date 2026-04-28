@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
-const CartContext = createContext();
+export const CartContext = createContext();
 
 export const useCart = () => useContext(CartContext);
 
@@ -9,7 +9,6 @@ export const CartProvider = ({ children }) => {
   const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
-    // Load cart from localStorage
     const savedCart = localStorage.getItem('scholaria_cart');
     if (savedCart) {
       const cart = JSON.parse(savedCart);
@@ -31,7 +30,6 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = (product, quantity = 1) => {
     const existingItem = cartItems.find(item => item.id === product.id);
-    
     if (existingItem) {
       const updatedCart = cartItems.map(item =>
         item.id === product.id
@@ -45,28 +43,20 @@ export const CartProvider = ({ children }) => {
   };
 
   const removeFromCart = (productId) => {
-    const updatedCart = cartItems.filter(item => item.id !== productId);
-    saveCart(updatedCart);
+    saveCart(cartItems.filter(item => item.id !== productId));
   };
 
   const updateQuantity = (productId, quantity) => {
-    if (quantity < 1) {
-      removeFromCart(productId);
-      return;
-    }
-    const updatedCart = cartItems.map(item =>
+    if (quantity < 1) { removeFromCart(productId); return; }
+    saveCart(cartItems.map(item =>
       item.id === productId ? { ...item, quantity } : item
-    );
-    saveCart(updatedCart);
+    ));
   };
 
-  const clearCart = () => {
-    saveCart([]);
-  };
+  const clearCart = () => saveCart([]);
 
-  const getCartTotal = () => {
-    return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  };
+  const getCartTotal = () =>
+    cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <CartContext.Provider value={{
@@ -76,7 +66,7 @@ export const CartProvider = ({ children }) => {
       removeFromCart,
       updateQuantity,
       clearCart,
-      getCartTotal
+      getCartTotal,
     }}>
       {children}
     </CartContext.Provider>

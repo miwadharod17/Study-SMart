@@ -49,7 +49,7 @@ variable "min_capacity" {
 variable "database_name" {
   description = "RDS database name"
   type        = string
-  default     = "studysmart_prod"
+  default     = "studysmart_db"
 }
 
 variable "database_user" {
