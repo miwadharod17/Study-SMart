@@ -1,35 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
 import Button from '../components/UI/Button';
 import Card, { CardBody } from '../components/UI/Card';
+import { useCart } from '../context/CartContext';
 
 const Cart = () => {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 1,
-      title: 'Signals & Systems — Oppenheim',
-      price: 480,
-      quantity: 1,
-      condition: 'Used',
-      seller: 'Kavya Iyer'
-    }
-  ]);
+  // ✅ FIX: Use CartContext instead of isolated local state so items added
+  //         from the Marketplace/ProductDetail pages are actually visible here.
+  const { cartItems, removeFromCart, updateQuantity, getCartTotal } = useCart();
 
-  const updateQuantity = (id, newQuantity) => {
-    if (newQuantity < 1) return;
-    setCartItems(items =>
-      items.map(item =>
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
-    );
-  };
-
-  const removeItem = (id) => {
-    setCartItems(items => items.filter(item => item.id !== id));
-  };
-
-  const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const totalAmount = getCartTotal();
 
   if (cartItems.length === 0) {
     return (
@@ -61,19 +42,22 @@ const Cart = () => {
                 <CardBody>
                   <div className="flex gap-4">
                     <div className="w-24 h-24 bg-gray-100 rounded flex items-center justify-center">
-                      <span className="text-gray-400 text-xs">No image</span>
+                      {item.images && item.images[0]
+                        ? <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover rounded" />
+                        : <span className="text-gray-400 text-xs">No image</span>
+                      }
                     </div>
                     <div className="flex-1">
                       <div className="flex justify-between">
                         <div>
                           <h3 className="font-semibold text-lg">{item.title}</h3>
-                          <p className="text-sm text-gray-500">Sold by: {item.seller}</p>
+                          <p className="text-sm text-gray-500">Sold by: {item.seller_name || item.seller}</p>
                           <span className="inline-block mt-1 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                             {item.condition}
                           </span>
                         </div>
                         <button
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => removeFromCart(item.id)}
                           className="text-red-500 hover:text-red-700"
                         >
                           Remove

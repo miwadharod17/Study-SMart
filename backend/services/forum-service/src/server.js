@@ -365,6 +365,52 @@ app.get('/api/tags/trending', async (req, res) => {
 });
 
 // WebSocket connection handling
+// ✅ FIX: Comment routes were defined in routes/comments.js but never mounted.
+//         Added GET (fetch comments for an answer) and POST (create comment) here.
+
+// Get comments for an answer
+app.get('/api/answers/:answerId/comments', async (req, res) => {
+    try {
+        const { answerId } = req.params;
+        const result = await pool.query(
+            `SELECT c.*, u.full_name as author_name
+             FROM comments c
+             LEFT JOIN users u ON u.id = c.author_id
+             WHERE c.answer_id = $1
+             ORDER BY c.created_at ASC`,
+            [answerId]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        logger.error('Error fetching comments:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create comment on an answer
+app.post('/api/answers/:answerId/comments', async (req, res) => {
+    try {
+        const { answerId } = req.params;
+        const { content, authorId } = req.body;
+
+        if (!content || !authorId) {
+            return res.status(400).json({ error: 'content and authorId are required' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO comments (answer_id, content, author_id)
+             VALUES ($1, $2, $3) RETURNING *`,
+            [answerId, content, authorId]
+        );
+
+        io.emit('new_comment', { answerId, comment: result.rows[0] });
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        logger.error('Error creating comment:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 io.on('connection', (socket) => {
     logger.info('New WebSocket connection');
     

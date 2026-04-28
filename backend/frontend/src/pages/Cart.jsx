@@ -1,35 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
 import Button from '../components/UI/Button';
 import Card, { CardBody } from '../components/UI/Card';
+import { useCart } from '../context/CartContext';
 
 const Cart = () => {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 1,
-      title: 'Signals & Systems — Oppenheim',
-      price: 480,
-      quantity: 1,
-      condition: 'Used',
-      seller: 'Kavya Iyer'
-    }
-  ]);
-
-  const updateQuantity = (id, newQuantity) => {
-    if (newQuantity < 1) return;
-    setCartItems(items =>
-      items.map(item =>
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
-    );
-  };
-
-  const removeItem = (id) => {
-    setCartItems(items => items.filter(item => item.id !== id));
-  };
-
-  const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const { cartItems, removeFromCart, updateQuantity, getCartTotal } = useCart();
+  const totalAmount = getCartTotal();
 
   if (cartItems.length === 0) {
     return (

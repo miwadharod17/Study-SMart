@@ -155,3 +155,17 @@ export const getPaymentStatus = (paymentId) =>
   fetch(`${BASE_URL}/api/payments/api/payment-status/${paymentId}`, {
     headers: getHeaders(),
   }).then(handleResponse);
+
+// ✅ FIX: Added missing comment API calls (routes existed on backend but were
+//         never mounted, and no frontend helpers existed for comments at all)
+export const getComments = (answerId) =>
+  fetch(`${BASE_URL}/api/forum/answers/${answerId}/comments`, {
+    headers: getHeaders(false),
+  }).then(handleResponse);
+
+export const createComment = (answerId, payload) =>
+  fetch(`${BASE_URL}/api/forum/answers/${answerId}/comments`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  }).then(handleResponse);

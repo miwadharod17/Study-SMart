@@ -452,7 +452,7 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
         const result = await pool.query(
             `INSERT INTO orders (buyer_id, seller_id, book_id, quantity, total_amount, shipping_address)
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [buyerId, book.rows[0].seller_id, bookId, quantity, totalAmount, shippingAddress]
+            [buyerId, book.rows[0].seller_id, bookId, quantity, totalAmount, JSON.stringify(shippingAddress)]
         );
         
         end({ method: 'POST', route: '/orders', status_code: 201 });

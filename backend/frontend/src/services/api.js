@@ -94,7 +94,7 @@ export const createOrder = (payload) =>
   }).then(handleResponse);
 
 export const getOrders = () =>
-  fetch(`${BASE_URL}/api/orders`, {
+  fetch(`${BASE_URL}/api/orders/my-orders`, {
     headers: getHeaders(),
   }).then(handleResponse);
 

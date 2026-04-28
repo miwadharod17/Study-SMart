@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout/Layout';
 import Card, { CardBody } from '../components/UI/Card';
 import Button from '../components/UI/Button';
 import { getQuestions, createQuestion, getTrendingTags } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { useContext } from 'react';
 
 const Forum = () => {
   const { user } = useContext(AuthContext);
@@ -118,7 +118,7 @@ const Forum = () => {
                       </div>
                       <div className="flex-1">
                         <h3 className="font-semibold text-lg hover:text-primary-600 cursor-pointer">
-                          {q.title}
+                          <Link to={`/forum/questions/${q.id}`}>{q.title}</Link>
                         </h3>
                         <p className="text-sm text-gray-600 mt-1">
                           {q.author_name} · {new Date(q.created_at).toLocaleDateString()}

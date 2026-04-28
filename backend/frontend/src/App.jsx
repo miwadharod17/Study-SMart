@@ -13,6 +13,7 @@ import Profile from './pages/Profile';
 import MyOrders from './pages/MyOrders';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import QuestionDetail from './pages/QuestionDetail';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/forum" element={<Forum />} />
+            <Route path="/forum/questions/:id" element={<QuestionDetail />} />
             <Route path="/sell" element={<Sell />} />
             <Route path="/orders" element={<MyOrders />} />
             <Route path="/signin" element={<SignIn />} />
