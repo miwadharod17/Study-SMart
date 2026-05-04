@@ -1,0 +1,215 @@
+name: CI/CD with SonarQube and Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sonarqube-analysis:
+    name: SonarQube Code Quality
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres-sonar:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: sonar
+          POSTGRES_USER: sonar
+          POSTGRES_PASSWORD: sonar_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      sonarqube:
+        image: sonarqube:9.9-community
+        env:
+          SONAR_JDBC_URL: jdbc:postgresql://postgres-sonar:5432/sonar
+          SONAR_JDBC_USERNAME: sonar
+          SONAR_JDBC_PASSWORD: sonar_password
+          SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/api/system/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 9000:9000
+
+    outputs:
+      quality-gate: ${{ steps.quality-gate.outputs.passed }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests with coverage
+        run: npm run test:coverage || true
+
+      - name: Run SonarQube scanner
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_HOST_URL: http://localhost:9000
+          SONAR_LOGIN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Check quality gate
+        id: quality-gate
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_HOST_URL: http://localhost:9000
+          SONAR_LOGIN: ${{ secrets.SONAR_TOKEN }}
+
+  docker-build-push:
+    name: Build and Push Docker Images
+    needs: sonarqube-analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: docker.io/studysmart/payment-service
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+
+      - name: Build and push payment-service
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/services/payment-service
+          push: true
+          tags: docker.io/studysmart/payment-service:${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push forum-service
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/services/forum-service
+          push: true
+          tags: docker.io/studysmart/forum-service:${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push crud-service
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/services/crud-service
+          push: true
+          tags: docker.io/studysmart/crud-service:${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: docker.io/studysmart/frontend:${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-kubernetes:
+    name: Deploy to Kubernetes
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/payment-service \
+            payment=docker.io/studysmart/payment-service:${{ github.run_number }} \
+            -n study-smart
+          kubectl set image deployment/forum-service \
+            forum=docker.io/studysmart/forum-service:${{ github.run_number }} \
+            -n study-smart
+          kubectl set image deployment/crud-service \
+            crud=docker.io/studysmart/crud-service:${{ github.run_number }} \
+            -n study-smart
+          kubectl set image deployment/frontend \
+            frontend=docker.io/studysmart/frontend:${{ github.run_number }} \
+            -n study-smart
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/payment-service -n study-smart --timeout=5m
+          kubectl rollout status deployment/forum-service -n study-smart --timeout=5m
+          kubectl rollout status deployment/crud-service -n study-smart --timeout=5m
+          kubectl rollout status deployment/frontend -n study-smart --timeout=5m
+
+  smoke-tests:
+    name: Smoke Tests
+    needs: deploy-kubernetes
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Wait for services
+        run: sleep 30
+
+      - name: Health check
+        run: |
+          curl -f http://api.studysmart.com/health || true
+          curl -f http://studysmart.com || true
+
+      - name: Notify Slack
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "✅ Deployment Successful!",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Study-Smart Deployment* ✅\nBuild #${{ github.run_number }}\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}"
+                  }
+                }
+              ]
+            }

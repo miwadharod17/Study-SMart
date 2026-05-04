@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sonarqube-config
+  namespace: study-smart
+data:
+  sonar.properties: |
+    sonar.core.serverBaseURL=http://sonarqube:9000
+    sonar.web.javaAddionalOpts=-server -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError
+    sonar.es.bootstrapChecksDisabled=true

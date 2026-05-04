@@ -1,4 +1,4 @@
-.PHONY: help build up down logs clean deploy backup restore health test lint fmt
+.PHONY: help build up down logs clean deploy backup restore health test lint fmt sonarqube-up sonarqube-down sonarqube-logs sonarqube-setup sonarqube-deploy-k8s sonarqube-status
 
 # Colors
 GREEN := \033[0;32m
@@ -48,6 +48,60 @@ restore: ## Restore from latest backup
 health: ## Run health checks
 	@printf '$(GREEN)Running health checks...$(NC)\n'
 	./scripts/health-check.sh
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# SonarQube Targets
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+sonarqube-up: ## Start SonarQube services (Docker Compose)
+	@printf '$(GREEN)Starting SonarQube...$(NC)\n'
+	cd sonarqube && docker-compose up -d
+	@printf '$(YELLOW)Waiting for SonarQube to be ready...$(NC)\n'
+	@sleep 30
+	@$(MAKE) sonarqube-status
+
+sonarqube-down: ## Stop SonarQube services
+	@printf '$(RED)Stopping SonarQube...$(NC)\n'
+	cd sonarqube && docker-compose down
+
+sonarqube-logs: ## View SonarQube logs
+	cd sonarqube && docker-compose logs -f sonarqube
+
+sonarqube-setup: ## Setup SonarQube for development (auto-config)
+	@printf '$(GREEN)Setting up SonarQube...$(NC)\n'
+	chmod +x scripts/setup-sonarqube.sh
+	./scripts/setup-sonarqube.sh
+
+sonarqube-deploy-k8s: ## Deploy SonarQube to Kubernetes
+	@printf '$(GREEN)Deploying SonarQube to Kubernetes...$(NC)\n'
+	chmod +x scripts/deploy-sonarqube-k8s.sh
+	./scripts/deploy-sonarqube-k8s.sh
+
+sonarqube-status: ## Check SonarQube health status
+	@printf '$(GREEN)Checking SonarQube status...$(NC)\n'
+	chmod +x scripts/monitor-sonarqube.sh
+	./scripts/monitor-sonarqube.sh || true
+	@printf '\n$(YELLOW)Access SonarQube at: http://localhost:9000$(NC)\n'
+	@printf '$(YELLOW)Credentials: admin/admin$(NC)\n'
+
+sonarqube-quality-gate: ## Run SonarQube analysis and check quality gate
+	@printf '$(GREEN)Running SonarQube analysis...$(NC)\n'
+	npm run test:coverage
+	sonar-scanner \
+		-Dsonar.projectKey=study-smart-main \
+		-Dsonar.sources=. \
+		-Dsonar.host.url=http://localhost:9000 \
+		-Dsonar.login=$(SONAR_LOGIN)
+
+sonarqube-clean: ## Stop and remove SonarQube data
+	@printf '$(RED)Removing SonarQube containers and volumes...$(NC)\n'
+	cd sonarqube && docker-compose down -v
+	@printf '$(GREEN)SonarQube cleaned$(NC)\n'
+
+sonarqube-docs: ## Open SonarQube documentation
+	@printf '$(GREEN)Opening SonarQube documentation...$(NC)\n'
+	@echo "See: docs/SONARQUBE_INTEGRATION.md"
+	@echo "See: SONARQUBE_README.md"
 
 test: ## Run all tests
 	@printf '$(GREEN)Running tests...$(NC)\n'

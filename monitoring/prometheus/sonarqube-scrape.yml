@@ -1,0 +1,10 @@
+  - job_name: 'sonarqube'
+    metrics_path: '/api/system/metrics'
+    static_configs:
+      - targets: ['sonarqube:9000']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'sonarqube'

@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  sonarqube:
+    image: sonarqube:9.9-community
+    container_name: studysmart-sonarqube
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://postgres-sonar:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar_password_2024
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+      SONARQUBE_JDBC_URL: jdbc:postgresql://postgres-sonar:5432/sonar
+      SONARQUBE_JDBC_USERNAME: sonar
+      SONARQUBE_JDBC_PASSWORD: sonar_password_2024
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_conf:/opt/sonarqube/conf
+    depends_on:
+      postgres-sonar:
+        condition: service_healthy
+    networks:
+      - sonarqube
+      - monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    labels:
+      - "monitoring=sonarqube"
+
+  postgres-sonar:
+    image: postgres:15-alpine
+    container_name: studysmart-postgres-sonar
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sonar
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar_password_2024
+    volumes:
+      - postgres_sonar_data:/var/lib/postgresql/data
+    networks:
+      - sonarqube
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
+  sonarqube_conf:
+  postgres_sonar_data:
+
+networks:
+  sonarqube:
+    driver: bridge
+  monitoring:
+    external: true

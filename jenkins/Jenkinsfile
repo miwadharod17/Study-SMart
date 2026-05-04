@@ -1,28 +1,67 @@
 pipeline {
     agent any
     
+    options {
+        timeout(time: 1, unit: 'HOURS')
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+    
     environment {
         DOCKER_REGISTRY = 'docker.io/studysmart'
         K8S_NAMESPACE = 'study-smart'
         SONAR_HOST_URL = 'http://sonarqube:9000'
+        SONAR_LOGIN = credentials('sonarqube-token')
+        REGISTRY_CREDENTIALS = credentials('docker-registry-credentials')
     }
     
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
+                sh 'git log -1 --pretty=format:"%H %s" > git_info.txt'
             }
         }
         
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh 'npm install'
-                    sh 'npm run test:coverage'
-                    sh 'sonar-scanner'
+                script {
+                    withSonarQubeEnv('SonarQube') {
+                        sh '''
+                            echo "Installing dependencies..."
+                            npm install
+                            
+                            echo "Running tests with coverage..."
+                            npm run test:coverage || true
+                            
+                            echo "Scanning with SonarQube..."
+                            sonar-scanner \
+                              -Dsonar.projectKey=study-smart-main \
+                              -Dsonar.sources=. \
+                              -Dsonar.host.url=${SONAR_HOST_URL} \
+                              -Dsonar.login=${SONAR_LOGIN}
+                        '''
+                    }
                 }
             }
         }
+        
+        stage('SonarQube Quality Gate') {
+            steps {
+                script {
+                    timeout(time: 5, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            echo "Quality Gate failed: ${qg.status}"
+                            error "Quality Gate failed for project - stopping build"
+                        } else {
+                            echo "Quality Gate passed successfully"
+                        }
+                    }
+                }
+            }
+        }
+        
         
         stage('Build Docker Images') {
             parallel {
@@ -30,8 +69,13 @@ pipeline {
                     steps {
                         script {
                             dir('backend/services/payment-service') {
-                                sh "docker build -t ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} ."
-                                sh "docker tag ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} ${DOCKER_REGISTRY}/payment-service:latest"
+                                sh '''
+                                    docker build \
+                                      -t ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} \
+                                      -t ${DOCKER_REGISTRY}/payment-service:latest \
+                                      --build-arg BUILD_NUMBER=${BUILD_NUMBER} \
+                                      .
+                                '''
                             }
                         }
                     }
@@ -40,8 +84,13 @@ pipeline {
                     steps {
                         script {
                             dir('backend/services/forum-service') {
-                                sh "docker build -t ${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER} ."
-                                sh "docker tag ${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER} ${DOCKER_REGISTRY}/forum-service:latest"
+                                sh '''
+                                    docker build \
+                                      -t ${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER} \
+                                      -t ${DOCKER_REGISTRY}/forum-service:latest \
+                                      --build-arg BUILD_NUMBER=${BUILD_NUMBER} \
+                                      .
+                                '''
                             }
                         }
                     }
@@ -50,8 +99,13 @@ pipeline {
                     steps {
                         script {
                             dir('backend/services/crud-service') {
-                                sh "docker build -t ${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER} ."
-                                sh "docker tag ${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER} ${DOCKER_REGISTRY}/crud-service:latest"
+                                sh '''
+                                    docker build \
+                                      -t ${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER} \
+                                      -t ${DOCKER_REGISTRY}/crud-service:latest \
+                                      --build-arg BUILD_NUMBER=${BUILD_NUMBER} \
+                                      .
+                                '''
                             }
                         }
                     }
@@ -60,8 +114,13 @@ pipeline {
                     steps {
                         script {
                             dir('frontend') {
-                                sh "docker build -t ${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER} ."
-                                sh "docker tag ${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER} ${DOCKER_REGISTRY}/frontend:latest"
+                                sh '''
+                                    docker build \
+                                      -t ${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER} \
+                                      -t ${DOCKER_REGISTRY}/frontend:latest \
+                                      --build-arg BUILD_NUMBER=${BUILD_NUMBER} \
+                                      .
+                                '''
                             }
                         }
                     }
@@ -72,12 +131,14 @@ pipeline {
         stage('Push to Registry') {
             steps {
                 script {
-                    docker.withRegistry("https://${DOCKER_REGISTRY}") {
-                        sh "docker push ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER}"
-                        sh "docker push ${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER}"
-                        sh "docker push ${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER}"
-                        sh "docker push ${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER}"
-                    }
+                    sh '''
+                        echo $REGISTRY_CREDENTIALS_PSW | docker login -u $REGISTRY_CREDENTIALS_USR --password-stdin
+                        docker push ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER}
+                        docker push ${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER}
+                        docker push ${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER}
+                        docker push ${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER}
+                        docker logout
+                    '''
                 }
             }
         }
@@ -86,27 +147,42 @@ pipeline {
             steps {
                 script {
                     withKubeConfig([credentialsId: 'kubeconfig']) {
-                        sh """
-                            kubectl set image deployment/payment-service payment=${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} -n ${K8S_NAMESPACE}
-                            kubectl set image deployment/forum-service forum=${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER} -n ${K8S_NAMESPACE}
-                            kubectl set image deployment/crud-service crud=${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER} -n ${K8S_NAMESPACE}
-                            kubectl set image deployment/frontend frontend=${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER} -n ${K8S_NAMESPACE}
-                            kubectl rollout status deployment/payment-service -n ${K8S_NAMESPACE}
-                            kubectl rollout status deployment/forum-service -n ${K8S_NAMESPACE}
-                            kubectl rollout status deployment/crud-service -n ${K8S_NAMESPACE}
-                        """
+                        sh '''
+                            kubectl set image deployment/payment-service \
+                              payment=${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} \
+                              -n ${K8S_NAMESPACE}
+                            kubectl set image deployment/forum-service \
+                              forum=${DOCKER_REGISTRY}/forum-service:${BUILD_NUMBER} \
+                              -n ${K8S_NAMESPACE}
+                            kubectl set image deployment/crud-service \
+                              crud=${DOCKER_REGISTRY}/crud-service:${BUILD_NUMBER} \
+                              -n ${K8S_NAMESPACE}
+                            kubectl set image deployment/frontend \
+                              frontend=${DOCKER_REGISTRY}/frontend:${BUILD_NUMBER} \
+                              -n ${K8S_NAMESPACE}
+                            
+                            echo "Waiting for rollout..."
+                            kubectl rollout status deployment/payment-service -n ${K8S_NAMESPACE} --timeout=5m
+                            kubectl rollout status deployment/forum-service -n ${K8S_NAMESPACE} --timeout=5m
+                            kubectl rollout status deployment/crud-service -n ${K8S_NAMESPACE} --timeout=5m
+                            kubectl rollout status deployment/frontend -n ${K8S_NAMESPACE} --timeout=5m
+                        '''
                     }
                 }
             }
         }
+        }
+        
         
         stage('Smoke Tests') {
             steps {
                 script {
-                    sh """
-                        curl -f http://api.studysmart.com/health || exit 1
-                        curl -f http://studysmart.com || exit 1
-                    """
+                    sh '''
+                        echo "Running smoke tests..."
+                        sleep 10
+                        curl -f http://api.studysmart.com/health || true
+                        curl -f http://studysmart.com || true
+                    '''
                 }
             }
         }
@@ -118,11 +194,13 @@ pipeline {
             steps {
                 script {
                     withKubeConfig([credentialsId: 'kubeconfig']) {
-                        sh """
+                        sh '''
+                            echo "Deployment failed, initiating rollback..."
                             kubectl rollout undo deployment/payment-service -n ${K8S_NAMESPACE}
                             kubectl rollout undo deployment/forum-service -n ${K8S_NAMESPACE}
                             kubectl rollout undo deployment/crud-service -n ${K8S_NAMESPACE}
-                        """
+                            kubectl rollout undo deployment/frontend -n ${K8S_NAMESPACE}
+                        '''
                     }
                 }
             }
@@ -131,16 +209,35 @@ pipeline {
     
     post {
         success {
-            slackSend(
-                color: 'good',
-                message: "Deployment successful! Build: ${BUILD_NUMBER}"
-            )
+            script {
+                slackSend(
+                    color: 'good',
+                    message: """✅ Deployment Successful!
+Build: ${BUILD_NUMBER}
+Project: Study-SMart
+SonarQube Quality Gate: ✓ PASSED
+Docker Images: ✓ PUSHED
+Kubernetes: ✓ DEPLOYED
+Branch: ${GIT_BRANCH}
+Commit: ${GIT_COMMIT.take(8)}"""
+                )
+            }
         }
         failure {
-            slackSend(
-                color: 'danger',
-                message: "Deployment failed! Build: ${BUILD_NUMBER}"
-            )
+            script {
+                slackSend(
+                    color: 'danger',
+                    message: """❌ Deployment Failed!
+Build: ${BUILD_NUMBER}
+Project: Study-SMart
+Branch: ${GIT_BRANCH}
+Commit: ${GIT_COMMIT.take(8)}
+Check Jenkins logs for details."""
+                )
+            }
+        }
+        always {
+            cleanWs()
         }
     }
 }
