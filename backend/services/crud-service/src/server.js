@@ -46,6 +46,9 @@ const pool = new Pool({
 const app = express();
 const PORT = process.env.PORT || 3003;
 
+// Trust proxy when behind nginx or other reverse proxies
+app.set('trust proxy', 1);
+
 // File upload configuration
 const storage = multer.memoryStorage();
 const upload = multer({ 
@@ -108,6 +111,25 @@ const authenticateToken = (req, res, next) => {
         req.user = user;
         next();
     });
+};
+
+const verifyAuthenticatedUser = async (req, res, next) => {
+    try {
+        if (!req.user?.id) {
+            return res.status(403).json({ error: 'Authenticated user information missing' });
+        }
+
+        const result = await pool.query('SELECT id FROM users WHERE id = $1', [req.user.id]);
+        if (result.rows.length === 0) {
+            logger.warn('Authenticated user no longer exists in database', { userId: req.user.id });
+            return res.status(403).json({ error: 'Authenticated user does not exist' });
+        }
+
+        next();
+    } catch (error) {
+        logger.error('Error verifying authenticated user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 };
 
 // ============ USERS CRUD ============
@@ -209,7 +231,7 @@ app.post('/api/users/login', async (req, res) => {
 });
 
 // Get user profile
-app.get('/api/users/profile/:id', authenticateToken, async (req, res) => {
+app.get('/api/users/profile/:id', authenticateToken, verifyAuthenticatedUser, async (req, res) => {
     const end = httpRequestDuration.startTimer();
     try {
         const { id } = req.params;
@@ -336,32 +358,36 @@ app.get('/api/books/:id', async (req, res) => {
 });
 
 // Create book listing
-app.post('/api/books', authenticateToken, upload.array('images', 5), async (req, res) => {
+app.post('/api/books', authenticateToken, verifyAuthenticatedUser, upload.array('images', 5), async (req, res) => {
     const end = httpRequestDuration.startTimer();
     try {
         const { title, description, price, condition, category, stock } = req.body;
         const sellerId = req.user.id;
-        
+
         // Handle image uploads (store URLs or base64)
         const images = req.files ? req.files.map(f => f.buffer.toString('base64')) : [];
-        
+
         const result = await pool.query(
             `INSERT INTO books (title, description, price, condition, category, stock, seller_id, images)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
             [title, description, price, condition, category, stock || 1, sellerId, images]
         );
-        
+
         end({ method: 'POST', route: '/books', status_code: 201 });
         res.status(201).json(result.rows[0]);
     } catch (error) {
         logger.error('Error creating book:', error);
+        if (error.code === '23503' && error.constraint === 'books_seller_id_fkey') {
+            end({ method: 'POST', route: '/books', status_code: 400 });
+            return res.status(400).json({ error: 'Invalid seller reference for book listing' });
+        }
         end({ method: 'POST', route: '/books', status_code: 500 });
         res.status(500).json({ error: error.message });
     }
 });
 
 // Update book
-app.put('/api/books/:id', authenticateToken, async (req, res) => {
+app.put('/api/books/:id', authenticateToken, verifyAuthenticatedUser, async (req, res) => {
     const end = httpRequestDuration.startTimer();
     try {
         const { id } = req.params;
@@ -404,7 +430,7 @@ app.put('/api/books/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete book
-app.delete('/api/books/:id', authenticateToken, async (req, res) => {
+app.delete('/api/books/:id', authenticateToken, verifyAuthenticatedUser, async (req, res) => {
     const end = httpRequestDuration.startTimer();
     try {
         const { id } = req.params;
@@ -431,7 +457,7 @@ app.delete('/api/books/:id', authenticateToken, async (req, res) => {
 // ============ ORDERS CRUD ============
 
 // Create order
-app.post('/api/orders', authenticateToken, async (req, res) => {
+app.post('/api/orders', authenticateToken, verifyAuthenticatedUser, async (req, res) => {
     const end = httpRequestDuration.startTimer();
     try {
         const { bookId, quantity, shippingAddress } = req.body;
@@ -465,7 +491,7 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
 });
 
 // Get user orders
-app.get('/api/orders', authenticateToken, async (req, res) => {
+app.get('/api/orders', authenticateToken, verifyAuthenticatedUser, async (req, res) => {
     const end = httpRequestDuration.startTimer();
     try {
         const userId = req.user.id;
@@ -489,7 +515,7 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 });
 
 // Update order status
-app.put('/api/orders/:id/status', authenticateToken, async (req, res) => {
+app.put('/api/orders/:id/status', authenticateToken, verifyAuthenticatedUser, async (req, res) => {
     const end = httpRequestDuration.startTimer();
     try {
         const { id } = req.params;

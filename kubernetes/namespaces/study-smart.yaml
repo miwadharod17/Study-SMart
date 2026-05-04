@@ -5,3 +5,8 @@ metadata:
   labels:
     name: study-smart
     environment: production
+    app: study-smart
+    managed-by: kubernetes
+    tier: full-stack
+  annotations:
+    description: "Study Smart microservices platform namespace"

@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
       - name: forum
-        image: forum-service:latest
-        imagePullPolicy: Always
+        image: backend-forum-service:latest
+        imagePullPolicy: IfNotPresent 
         ports:
         - containerPort: 3002
           name: http

@@ -34,6 +34,7 @@ const Checkout = () => {
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (!user) { navigate('/signin'); return; }
+    if (cartItems.length === 0) { setError('Cart is empty'); return; }
     setError('');
     setProcessing(true);
     try {
@@ -42,7 +43,7 @@ const Checkout = () => {
         const order = await createOrder({
           bookId: item.id,
           quantity: item.quantity,
-          shippingAddress,
+          shippingAddress: JSON.stringify(shippingAddress),
         });
         orderIds.push(order.id);
       }
@@ -61,6 +62,7 @@ const Checkout = () => {
       setStep('done');
     } catch (err) {
       setError(err.message || 'Order placement failed. Please try again.');
+      console.error('Checkout error:', err);
     } finally {
       setProcessing(false);
     }

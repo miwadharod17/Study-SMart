@@ -7,7 +7,7 @@ spec:
   selector:
     app: crud-service
   ports:
-  - port: 3003
+  - name: http
+    port: 3003
     targetPort: 3003
-    name: http
   type: ClusterIP

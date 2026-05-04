@@ -51,7 +51,7 @@ const Cart = () => {
                       <div className="flex justify-between">
                         <div>
                           <h3 className="font-semibold text-lg">{item.title}</h3>
-                          <p className="text-sm text-gray-500">Sold by: {item.seller_name || item.seller}</p>
+                          <p className="text-sm text-gray-500">Sold by: {item.seller_name || item.seller?.name || item.seller}</p>
                           <span className="inline-block mt-1 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                             {item.condition}
                           </span>

@@ -61,7 +61,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build: ../frontend
     container_name: study_smart_frontend
     env_file:
       - .env
@@ -75,9 +75,8 @@ services:
     build: ./api-gateway
     container_name: study_smart_nginx
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
+      - "8080:80"
+      - "8081:8080"
     depends_on:
       - payment-service
       - forum-service

@@ -58,7 +58,7 @@ const Home = () => {
       <section className="bg-gray-100 py-16">
         <div className="container-custom">
           <h2 className="text-3xl font-bold text-center mb-12">Three things, done well</h2>
-          <p className="text-center text-gray-600 mb-12">Scholaria brings together the three things every student actually needs.</p>
+          <p className="text-center text-gray-600 mb-12">StudySMart brings together the three things every student actually needs.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card>
               <CardBody className="text-center">

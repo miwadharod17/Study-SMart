@@ -3,57 +3,78 @@ kind: ConfigMap
 metadata:
   name: nginx-config
   namespace: study-smart
+
 data:
   nginx.conf: |
     events {
         worker_connections 1024;
     }
-    
+
     http {
+
+        # Upstreams (Kubernetes service names MUST match exactly)
         upstream payment {
             server payment-service:3001;
         }
-        
+
         upstream forum {
             server forum-service:3002;
         }
-        
+
         upstream crud {
             server crud-service:3003;
         }
-        
+
         upstream frontend {
-            server frontend-service:80;
+            server frontend:3000;
         }
-        
+
+        # ================= API SERVER =================
         server {
             listen 80;
             server_name api.studysmart.com;
-            
+
+            # Payment service
             location /api/payments/ {
                 proxy_pass http://payment/;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             }
-            
+
+            # Forum service (WebSocket enabled)
             location /api/forum/ {
                 proxy_pass http://forum/;
+
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+
                 proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             }
-            
-            location /api/ {
+
+            # CRUD service (IMPORTANT: avoid generic /api catch-all confusion)
+            location /api/crud/ {
                 proxy_pass http://crud/;
                 proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             }
         }
-        
+
+        # ================= FRONTEND =================
         server {
             listen 80;
             server_name studysmart.com;
-            
+
             location / {
                 proxy_pass http://frontend/;
+
                 proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             }
         }
     }

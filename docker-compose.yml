@@ -1,8 +1,37 @@
-version: '3.9'
-
 services:
-  # ... (your existing services: postgres, redis, pgadmin, redis-commander, prometheus, grafana)
+  postgres:
+    build: ./backend/database
+    container_name: studysmart_postgres
+    environment:
+      POSTGRES_USER: studysmart
+      POSTGRES_PASSWORD: studysmart
+      POSTGRES_DB: studysmart_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - studysmart_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studysmart -d studysmart_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  redis:
+    image: redis:alpine
+    container_name: studysmart_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - studysmart_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   # ── Backend Microservices ────────────────────────────────────────────────
   payment-service:
     build: ./backend/services/payment-service
@@ -17,6 +46,7 @@ services:
       DB_NAME: studysmart_db
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      JWT_SECRET: studysmart_jwt_secret_key_2024
     ports:
       - '3001:3001'
     depends_on:
@@ -39,6 +69,7 @@ services:
       DB_PASSWORD: studysmart
       DB_NAME: studysmart_db
       REDIS_HOST: redis
+      JWT_SECRET: studysmart_jwt_secret_key_2024
     ports:
       - '3002:3002'
     depends_on:
@@ -59,6 +90,7 @@ services:
       DB_PASSWORD: studysmart
       DB_NAME: studysmart_db
       REDIS_HOST: redis
+      JWT_SECRET: studysmart_jwt_secret_key_2024
     ports:
       - '3003:3003'
     depends_on:
@@ -73,7 +105,7 @@ services:
     container_name: studysmart_frontend
     restart: unless-stopped
     ports:
-      - '80:80'
+      - '3000:3000'
     depends_on:
       - payment-service
       - forum-service
@@ -83,14 +115,12 @@ services:
 
   # ── Nginx API Gateway ─────────────────────────────────────────────────────
   nginx:
-    image: nginx:alpine
+    build: ./backend/api-gateway
     container_name: studysmart_nginx
     restart: unless-stopped
-    volumes:
-      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
     ports:
+      - '8080:8080'
       - '80:80'
-      - '443:443'
     depends_on:
       - payment-service
       - forum-service

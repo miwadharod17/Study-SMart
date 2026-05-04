@@ -1,8 +1,12 @@
 ---
 - name: Setup monitoring stack
-  hosts: monitoring_hosts
+  hosts: monitoring_hosts,app_servers
   become: yes
-  
+  vars:
+    node_exporter_version: "1.7.0"
+  vars_files:
+    - ../group_vars/all/vars.yml
+    - ../group_vars/all/vault.yml
   roles:
     - role: monitoring
       vars:
@@ -35,56 +39,15 @@
       notify: restart alertmanager
     
     - name: Start monitoring stack with docker-compose
-      docker_compose:
-        project_src: /opt/monitoring
-        definition:
-          version: '3.8'
-          services:
-            prometheus:
-              image: prom/prometheus:latest
-              ports:
-                - "9090:9090"
-              volumes:
-                - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-                - prometheus_data:/prometheus
-              command:
-                - '--config.file=/etc/prometheus/prometheus.yml'
-                - '--storage.tsdb.path=/prometheus'
-            
-            grafana:
-              image: grafana/grafana:latest
-              ports:
-                - "3000:3000"
-              environment:
-                - GF_SECURITY_ADMIN_PASSWORD={{ grafana_password }}
-              volumes:
-                - grafana_data:/var/lib/grafana
-            
-            node-exporter:
-              image: prom/node-exporter:latest
-              ports:
-                - "9100:9100"
-              volumes:
-                - /proc:/host/proc:ro
-                - /sys:/host/sys:ro
-                - /:/rootfs:ro
-              command:
-                - '--path.procfs=/host/proc'
-                - '--path.sysfs=/host/sys'
-                - '--path.rootfs=/rootfs'
-          
-          volumes:
-            prometheus_data:
-            grafana_data:
-        state: present
-    
+      ansible.builtin.shell: docker compose up -d
+      args:
+        chdir: /opt/monitoring
+      ignore_errors: yes
+      when: ansible_virtualization_type == "docker"
   handlers:
     - name: restart prometheus
-      docker_container:
-        name: prometheus
-        state: restarted
-    
+      ansible.builtin.shell: docker restart prometheus
+      ignore_errors: yes
     - name: restart alertmanager
-      docker_container:
-        name: alertmanager
-        state: restarted
+      ansible.builtin.shell: docker restart alertmanager
+      ignore_errors: yes

@@ -5,15 +5,10 @@ metadata:
   namespace: study-smart
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx
-  tls:
-  - hosts:
-    - api.studysmart.com
-    - studysmart.com
-    secretName: tls-secret
+
   rules:
   - host: api.studysmart.com
     http:
@@ -25,6 +20,7 @@ spec:
             name: payment-service
             port:
               number: 3001
+
       - path: /api/forum
         pathType: Prefix
         backend:
@@ -32,13 +28,15 @@ spec:
             name: forum-service
             port:
               number: 3002
-      - path: /api
+
+      - path: /api/crud
         pathType: Prefix
         backend:
           service:
             name: crud-service
             port:
               number: 3003
+
   - host: studysmart.com
     http:
       paths:

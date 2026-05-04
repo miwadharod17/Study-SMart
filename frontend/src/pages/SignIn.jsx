@@ -21,7 +21,7 @@ const SignIn = () => {
     try {
       const data = await loginUser({ email, password });
       // Store token separately; store user in context
-      localStorage.setItem('scholaria_token', data.token);
+      localStorage.setItem('studysmart_token', data.token);
       login({ ...data.user, token: data.token });
       navigate('/');
     } catch (err) {
@@ -35,7 +35,7 @@ const SignIn = () => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary-600">Scholaria</h1>
+          <h1 className="text-3xl font-bold text-primary-600">StudySMart</h1>
           <p className="text-gray-600 mt-2">Knowledge has a fair price.</p>
         </div>
 

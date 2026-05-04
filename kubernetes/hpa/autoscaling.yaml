@@ -8,8 +8,10 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: payment-service
+
   minReplicas: 2
   maxReplicas: 10
+
   metrics:
   - type: Resource
     resource:
@@ -17,12 +19,14 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
+
   - type: Resource
     resource:
       name: memory
       target:
         type: Utilization
         averageUtilization: 80
+
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -34,8 +38,10 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: crud-service
-  minReplicas: 3
+
+  minReplicas: 2
   maxReplicas: 15
+
   metrics:
   - type: Resource
     resource:
@@ -43,3 +49,10 @@ spec:
       target:
         type: Utilization
         averageUtilization: 65
+
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75

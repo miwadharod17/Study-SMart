@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
       - name: crud
-        image: crud-service:latest
-        imagePullPolicy: Always
+        image: backend-crud-service:latest
+        imagePullPolicy: IfNotPresent 
         ports:
         - containerPort: 3003
           name: http

@@ -9,7 +9,7 @@ export const CartProvider = ({ children }) => {
   const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem('scholaria_cart');
+    const savedCart = localStorage.getItem('studysmart_cart');
     if (savedCart) {
       const cart = JSON.parse(savedCart);
       setCartItems(cart);
@@ -23,7 +23,7 @@ export const CartProvider = ({ children }) => {
   };
 
   const saveCart = (items) => {
-    localStorage.setItem('scholaria_cart', JSON.stringify(items));
+    localStorage.setItem('studysmart_cart', JSON.stringify(items));
     setCartItems(items);
     updateCartCount(items);
   };

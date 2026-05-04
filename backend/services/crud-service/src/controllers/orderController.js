@@ -10,31 +10,61 @@ const pool = new Pool({
 });
 
 exports.createOrder = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { bookId, quantity, shippingAddress } = req.body;
         const buyerId = req.user.id;
-        
-        const book = await pool.query(
-            'SELECT price, seller_id, title FROM books WHERE id = $1 AND is_active = true',
+        const qty = parseInt(quantity, 10) || 1;
+
+        await client.query('BEGIN');
+
+        const bookResult = await client.query(
+            'SELECT price, seller_id, title, stock FROM books WHERE id = $1 AND is_active = true FOR UPDATE',
             [bookId]
         );
-        
-        if (book.rows.length === 0) {
+
+        if (bookResult.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ error: 'Book not available' });
         }
-        
-        const totalAmount = book.rows[0].price * quantity;
-        
-        const result = await pool.query(
+
+        const book = bookResult.rows[0];
+
+        if (qty <= 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Invalid quantity' });
+        }
+
+        if (book.stock < qty) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Insufficient stock' });
+        }
+
+        const totalAmount = book.price * qty;
+
+        const orderResult = await client.query(
             `INSERT INTO orders (buyer_id, seller_id, book_id, quantity, total_amount, shipping_address)
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [buyerId, book.rows[0].seller_id, bookId, quantity, totalAmount, shippingAddress]
+            [buyerId, book.seller_id, bookId, qty, totalAmount, shippingAddress]
         );
-        
-        res.status(201).json(result.rows[0]);
+
+        await client.query(
+            `UPDATE books
+             SET stock = stock - $1,
+                 is_active = CASE WHEN stock - $1 <= 0 THEN false ELSE true END
+             WHERE id = $2`,
+            [qty, bookId]
+        );
+
+        await client.query('COMMIT');
+
+        res.status(201).json(orderResult.rows[0]);
     } catch (error) {
+        await client.query('ROLLBACK');
         logger.error('Error creating order:', error);
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
 

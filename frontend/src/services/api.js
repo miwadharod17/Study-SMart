@@ -1,13 +1,13 @@
-// Central API client — all requests go through nginx on port 80
+// Central API client — all requests go through nginx on the local gateway port
 const DEFAULT_LOCAL_API = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://127.0.0.1'
+  ? 'http://127.0.0.1:8080'
   : '';
 const BASE_URL = process.env.REACT_APP_API_URL || DEFAULT_LOCAL_API;
 
 const getHeaders = (includeAuth = true) => {
   const headers = { 'Content-Type': 'application/json' };
   if (includeAuth) {
-    const token = localStorage.getItem('scholaria_token');
+    const token = localStorage.getItem('studysmart_token');
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
@@ -57,7 +57,7 @@ export const getBook = (id) =>
 export const createBook = (formData) =>
   fetch(`${BASE_URL}/api/books`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${localStorage.getItem('scholaria_token')}` },
+    headers: { Authorization: `Bearer ${localStorage.getItem('studysmart_token')}` },
     body: formData, // FormData (multipart for images)
   }).then(handleResponse);
 
@@ -165,6 +165,18 @@ export const getComments = (answerId) =>
 
 export const createComment = (answerId, payload) =>
   fetch(`${BASE_URL}/api/forum/answers/${answerId}/comments`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  }).then(handleResponse);
+
+export const getQuestionComments = (questionId) =>
+  fetch(`${BASE_URL}/api/forum/questions/${questionId}/comments`, {
+    headers: getHeaders(false),
+  }).then(handleResponse);
+
+export const createQuestionComment = (questionId, payload) =>
+  fetch(`${BASE_URL}/api/forum/questions/${questionId}/comments`, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(payload),

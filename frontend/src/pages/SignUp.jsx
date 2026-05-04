@@ -22,7 +22,7 @@ const SignUp = () => {
     setLoading(true);
     try {
       const data = await registerUser({ email, password, fullName, role: userType });
-      localStorage.setItem('scholaria_token', data.token);
+      localStorage.setItem('studysmart_token', data.token);
       login({ ...data.user, token: data.token });
       navigate('/');
     } catch (err) {
@@ -36,13 +36,13 @@ const SignUp = () => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-primary-600">Scholaria</h1>
+          <h1 className="text-2xl font-bold text-primary-600">StudySMart</h1>
         </div>
 
         <Card>
           <CardBody>
             <h2 className="text-2xl font-bold mb-4">Create your account</h2>
-            <p className="text-gray-600 mb-6">Choose how you'll use Scholaria.</p>
+            <p className="text-gray-600 mb-6">Choose how you'll use StudySMart.</p>
 
             <div className="flex gap-4 mb-6">
               <button

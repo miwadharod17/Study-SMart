@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
       - name: payment
-        image: payment-service:latest
-        imagePullPolicy: Always
+        image: backend-payment-service:latest
+        imagePullPolicy: IfNotPresent 
         ports:
         - containerPort: 3001
           name: http

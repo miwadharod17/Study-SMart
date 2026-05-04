@@ -7,7 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('scholaria_user');
+    const storedUser = localStorage.getItem('studysmart_user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
@@ -16,12 +16,12 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData) => {
     setUser(userData);
-    localStorage.setItem('scholaria_user', JSON.stringify(userData));
+    localStorage.setItem('studysmart_user', JSON.stringify(userData));
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('scholaria_user');
+    localStorage.removeItem('studysmart_user');
   };
 
   return (

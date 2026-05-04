@@ -7,7 +7,7 @@ const Footer = () => {
       <div className="container-custom py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-1">
-            <h3 className="text-xl font-bold text-primary-600 mb-4">Scholaria</h3>
+            <h3 className="text-xl font-bold text-primary-600 mb-4">StudySMart</h3>
             <p className="text-gray-600 text-sm">
               The student-first marketplace and Q&A community for academic life.
             </p>
@@ -40,7 +40,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-gray-200 mt-8 pt-8 text-center text-sm text-gray-500">
-          <p>© 2026 Scholaria · Built for students, by students</p>
+          <p>© 2026 StudySMart · Built for students, by students</p>
         </div>
       </div>
     </footer>

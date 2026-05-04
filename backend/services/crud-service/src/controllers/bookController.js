@@ -120,7 +120,16 @@ exports.createBook = async (req, res) => {
         const sellerId = req.user.id;
         
         // Handle image uploads (store as base64 or URLs)
-        const images = req.files ? req.files.map(f => f.buffer.toString('base64')) : [];
+        let images = [];
+        if (req.files) {
+            images = req.files.map(f => f.buffer.toString('base64'));
+        }
+        
+        // Handle image URLs from form data
+        if (req.body.imageUrls) {
+            const urls = Array.isArray(req.body.imageUrls) ? req.body.imageUrls : [req.body.imageUrls];
+            images = images.concat(urls.filter(url => url && url.trim()));
+        }
         
         const result = await pool.query(
             `INSERT INTO books (title, description, price, condition, category, stock, seller_id, images)
